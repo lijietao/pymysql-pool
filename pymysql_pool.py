@@ -129,5 +129,6 @@ class PyMysqlPool(object):
         if conn and isinstance(conn, Connection):
             PyMysqlPool._IDLE_CONN.append(conn)
             PyMysqlPool._USE_CONN.remove(conn)
+            
 
 
