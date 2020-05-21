@@ -11,6 +11,7 @@ file name:pymysql_pool.py
 ******************************************************
 '''
 
+import time
 import traceback
 import threading
 import logging
@@ -28,6 +29,9 @@ class PyMysqlPool(object):
     _IDLE_CONN = list()
     _USE_CONN = list()
     _RESOURCE = None
+    _INSTANCE = None
+    _LIFE_CYCLE = 30*60  # 达到最大空闲数时，连接存活最大时间(秒),
+    _INSTANCE_META = dict()
 
     def __init__(self, host: str, port: int, user: str, password: str, dbname: str, max_conn: int, max_idle_conn: int):
         self._max_conn = max_conn
@@ -37,6 +41,12 @@ class PyMysqlPool(object):
         self._user = user
         self._password = password
         self._dbname = dbname
+
+    def __new__(cls, *args, **kwargs):
+        if cls._INSTANCE is None:
+            cls._INSTANCE = object.__new__(cls)
+
+        return cls._INSTANCE
 
     def _create_resource(self):
         """
@@ -58,13 +68,16 @@ class PyMysqlPool(object):
         创建并返回连接实例
         :return:
         """
-        return Connection(host=self._host,
+        conn = Connection(host=self._host,
                           port=self._port,
                           user=self._user,
                           password=self._password,
                           db=self._dbname,
                           cursorclass=DictCursor
                           )
+
+        PyMysqlPool._INSTANCE_META.update({conn: time.time()})
+        return conn
 
     def get_connection(self):
         """
@@ -108,8 +121,9 @@ class PyMysqlPool(object):
             PyMysqlPool._LOCK.acquire()
             if PyMysqlPool._RESOURCE is None:
                 self._create_resource()
+                PyMysqlPool._RESOURCE = 1
 
-                PyMysqlPool._LOCK.release()
+            PyMysqlPool._LOCK.release()
 
     def get_mysql_connection(self):
         """
@@ -126,8 +140,19 @@ class PyMysqlPool(object):
         :return:
         """
 
-        if conn and isinstance(conn, Connection):
-            PyMysqlPool._IDLE_CONN.append(conn)
-            PyMysqlPool._USE_CONN.remove(conn)
+        try:
+            if conn and isinstance(conn, Connection):
+                _instance_create_time = PyMysqlPool._INSTANCE_META.get(conn)
+                # 当前空闲连数接小于定义的最大空闲连接数,且实例创建时间与当前时间的差值小于定义的_LIFE_CYCLE,则该连接实例回收;反之不回收
+                if PyMysqlPool._IDLE_CONN.__len__() < self._max_idle_conn and (time.time() - _instance_create_time) < PyMysqlPool._LIFE_CYCLE:
+                    PyMysqlPool._IDLE_CONN.append(conn)
+                    PyMysqlPool._USE_CONN.remove(conn)
+
+                else:
+                    # 从连接实例原始数据里面移除该连接实例
+                    PyMysqlPool._INSTANCE_META.pop(conn)
+
+        except Exception as err:
+            log.error("%s, %s", err, traceback.format_exc())
 
 

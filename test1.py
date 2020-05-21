@@ -20,6 +20,7 @@ from mysql_utility import MysqlUtility
 def test1():
 
     a = 0
+    s_time = time.time()
     while a < 500:
         a += 1
         try:
@@ -33,14 +34,17 @@ def test1():
                                  )
 
             sql = "SELECT * FROM `test` "
+            s = time.time()
             res = mysql.findAll(sql)
             mysql.close()
-            print(threading.get_ident(), a, res)
+            print(threading.get_ident(), time.time() - s, a, res)
 
         except Exception as err:
             print("test error", err, traceback.format_exc())
 
-        time.sleep(0.1)
+        # time.sleep(0.1)
+
+    print(threading.get_ident(), " use time, ", time.time() - s_time)
 
 
 if __name__ == "__main__":
