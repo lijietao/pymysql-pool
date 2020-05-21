@@ -1,6 +1,6 @@
 #-*- coding: utf-8 -*-
 
-__author__ = 'F4367281'
+__author__ = 'lijietao'
 __version__ = '1.0'
 '''
 *********************History**************************
@@ -139,7 +139,6 @@ class PyMysqlPool(object):
         :param conn:
         :return:
         """
-
         try:
             if conn and isinstance(conn, Connection):
                 _instance_create_time = PyMysqlPool._INSTANCE_META.get(conn)
